@@ -78,7 +78,7 @@ ser = serial.Serial(
         parity='N',
         stopbits=1,
         xonxoff=0,
-        rtscts=1,
+        rtscts=0,
         timeout=1
 )
 
