@@ -89,7 +89,6 @@ def _checksum(packet):
     xorsum = 0
     for s in packet:
         xorsum ^= ord(s)
-    print('xorsum: ' + hex(xorsum))
     return xorsum
 
 def _printpacket(packet):
@@ -98,14 +97,61 @@ def _printpacket(packet):
         packetprint += hex(ord(s)) + ' '
     print(packetprint)
 
+def receivepacket():
+    bytes = []
+    endofpacket = False
+    while not endofpacket and ser.inWaiting():
+        byte = ser.read()
+        print 'byte: ' + str(byte)
+        if byte != '':
+            bytes.append(byte)
+        if byte == ETX: endofpacket = True
+    # don't forget the checksum...
+    if ser.inWaiting():
+        bytes.append(hex(ser.read()))
+    return bytes
+
+def parsecommand(packet):
+    '''parse the "command" byte from the response packet to get a "response code"'''
+    cmd = ord(packet[2])
+    if cmd == ACK: # Accepted/Positive Status
+        print 'ACK - Accepted/Positive Status'
+    elif cmd == NAK: # Rejected/Negative Status
+        print 'NAK - Rejected/Negative Status'
+    elif cmd == INC: # Incomplete Command Packet
+	print 'INC - Incomplete Command Packet'
+    elif cmd == UNR: # Unrecognized Command Packet
+        print 'UNR - Unrecognized Command Packet'
+    elif cmd == CER: # Data Packet Checksum Error
+        print 'CER - Data Packet Checksum Error'
+    else:
+        raise Exception('Received bad CMD in response from card dispenser')
+
+    print packet
+
+def parsedata(packet):
+    '''parse the data section of a packet, it can range from 0 to many bytes'''
+    data = []
+    datalength = ord(packet[3])
+    position = 0
+    while position < datalength:
+        data.append(packet[position + 3])
+    return data
+
+def parseresponse(packet):
+    receivedchecksum = ord(packet[-1])
+    print packet[0:-1]
+    calculatedchecksum  = _checksum(packet[0:-1])
+    print str(receivedchecksum) + ' == ' + str(calculatedchecksum)
+    parsecommand(packet)
+
 # <STX><ADD><CMD><LEN><DTA><ETX><CHK>
-def sendpacket(command, datalength=0, data=None):
+def sendcommand(command, datalength=0, data=None):
     '''send a packet in the vendapin format'''
     packet = chr(STX) + chr(ADD) + chr(command) + chr(datalength)
     if datalength > 0:
         packet += chr(data)
     packet += chr(ETX)
-    _printpacket(packet)
     sendpacket = packet + chr(_checksum(packet))
     _printpacket(sendpacket)
     ser.write(sendpacket)
@@ -115,14 +161,17 @@ def sendpacket(command, datalength=0, data=None):
 # for testing from the command line:
 def main(argv):
     print('GO!')
-#    sendpacket(REQUEST_STATUS)
-    sendpacket(DISPENSE)
-    bytes = []
+#    print sendcommand(REQUEST_STATUS)
+#    time.sleep(2)
+    print sendcommand(DISPENSE)
+    waiting = True
+    while waiting:
+        if ser.inWaiting() > 0:
+            waiting = False
+    response = receivepacket()
+    print 'response: ' + str(response)
+    parseresponse(response)
     print('inWaiting: ' + str(ser.inWaiting()))
-#    print ser.readline(size=None, eol=chr(ETX))
-    bytes.append(ser.read())
-    print('inWaiting: ' + str(ser.inWaiting()))
-    return str(bytes)
     ser.close()
     
 if __name__ == "__main__":
