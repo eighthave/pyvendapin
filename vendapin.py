@@ -73,7 +73,13 @@ LOW_CARD = 0x37      #
 
 ser = serial.Serial(
 	port='/dev/tty.usbserial-0000201A',
-	baudrate=19200
+	baudrate=19200,
+        bytesize=8,
+        parity='N',
+        stopbits=1,
+        xonxoff=0,
+        rtscts=1,
+        timeout=1
 )
 
 ser.open()
@@ -93,7 +99,7 @@ def _printpacket(packet):
     print(packetprint)
 
 # <STX><ADD><CMD><LEN><DTA><ETX><CHK>
-def sendpacket(command, datalength, data=None):
+def sendpacket(command, datalength=0, data=None):
     '''send a packet in the vendapin format'''
     packet = chr(STX) + chr(ADD) + chr(command) + chr(datalength)
     if datalength > 0:
@@ -103,25 +109,20 @@ def sendpacket(command, datalength, data=None):
     sendpacket = packet + chr(_checksum(packet))
     _printpacket(sendpacket)
     ser.write(sendpacket)
-    bytes = []
-    print('inWaiting: ' + str(ser.inWaiting()))
-    bytes.append(ser.read())
-    bytes.append(ser.read())
-    bytes.append(ser.read())
-    bytes.append(ser.read())
-    bytes.append(ser.read())
-    bytes.append(ser.read())
-    bytes.append(ser.read())
-    print('inWaiting: ' + str(ser.inWaiting()))
-    return str(bytes)
 
 
 #------------------------------------------------------------------------------#
 # for testing from the command line:
 def main(argv):
     print('GO!')
-    response = sendpacket(REQUEST_STATUS, 0x0)
-    print('response: ' + str(response))
+#    sendpacket(REQUEST_STATUS)
+    sendpacket(DISPENSE)
+    bytes = []
+    print('inWaiting: ' + str(ser.inWaiting()))
+#    print ser.readline(size=None, eol=chr(ETX))
+    bytes.append(ser.read())
+    print('inWaiting: ' + str(ser.inWaiting()))
+    return str(bytes)
     ser.close()
     
 if __name__ == "__main__":
