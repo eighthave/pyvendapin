@@ -21,6 +21,9 @@ ADD = 0x01  # Device Address (Set to 0x01 if not used)
 ETX = 0x03  # End of Text Data
 # CHK - XOR Checksum of data packet
 
+PACKET_MIN = 5 # the maximum packet length
+PACKET_MAX = 128 # the maximum packet length
+
 # commands
 ENABLE = 0xFE   # Enable VCB-2 Motor Control (Default at start-up)
 DISABLE = 0xFF  # Disable VCB-2 Motor Control
@@ -97,6 +100,7 @@ def _printpacket(packet):
         packetprint += hex(ord(s)) + ' '
     print(packetprint)
 
+
 def receivepacket():
     bytes = []
     endofpacket = False
@@ -108,8 +112,9 @@ def receivepacket():
         if byte == ETX: endofpacket = True
     # don't forget the checksum...
     if ser.inWaiting():
-        bytes.append(hex(ser.read()))
+        bytes.append(ser.read())
     return bytes
+
 
 def parsecommand(packet):
     '''parse the "command" byte from the response packet to get a "response code"'''
@@ -129,6 +134,7 @@ def parsecommand(packet):
 
     print packet
 
+
 def parsedata(packet):
     '''parse the data section of a packet, it can range from 0 to many bytes'''
     data = []
@@ -138,7 +144,13 @@ def parsedata(packet):
         data.append(packet[position + 3])
     return data
 
+
 def parseresponse(packet):
+    if ord(packet[0]) != STX or ord(packet[-2]) != ETX:
+        print 'this is not a packet: ' + str(packet)
+        # this is not a packet, it could be the startup string, or a
+        # garbled package, or something else
+        return
     receivedchecksum = ord(packet[-1])
     print packet[0:-1]
     calculatedchecksum  = _checksum(packet[0:-1])
