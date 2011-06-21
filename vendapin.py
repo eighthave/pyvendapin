@@ -10,6 +10,13 @@ import serial
 import time
 
 
+class NakException(Exception):
+    '''exception for when the device replies with NAK, not succesful'''
+    def __init__(self, message, code):
+        Exception.__init__(self, message)
+        self.code = code
+
+
 # packet breakdown:
 # <STX><ADD><CMD><LEN><DTA><ETX><CHK>
 #
@@ -69,10 +76,10 @@ READY = 0x30         # Ready to dispense the card
 BUSY  = 0x31         # The card dispenser is busy dispensing the card
 EMPTY = 0x32         # No cards inside the card dispenser stack
 STUCK = 0x33         # Card is jammed inside the card dispenser
-CARDHOLD = 0x34      # Card is dispensed, but not yet removed
-DISABLED = 0x35      # 
-CHECK_SENSORS = 0x36 #
-LOW_CARD = 0x37      # 
+CARD_HOLD = 0x34     # Card is dispensed, but not yet removed
+DISABLED = 0x35
+CHECK_SENSORS = 0x36
+LOW_CARD_DETECTED = 0x37
 
 ser = serial.Serial(
 	port='/dev/tty.usbserial-0000201A',
@@ -106,7 +113,6 @@ def receivepacket():
     endofpacket = False
     while not endofpacket and ser.inWaiting():
         byte = ser.read()
-        print 'byte: ' + str(byte)
         if byte != '':
             bytes.append(byte)
         if byte == ETX: endofpacket = True
@@ -129,33 +135,55 @@ def _matchchecksum(packet):
 
 
 def parseresponsecode(packet):
-def parsecommand(packet):
     '''parse the "command" byte from the response packet to get a "response code"'''
     cmd = ord(packet[2])
     if cmd == ACK: # Accepted/Positive Status
-        print 'ACK - Accepted/Positive Status'
+        return True
     elif cmd == NAK: # Rejected/Negative Status
-        print 'NAK - Rejected/Negative Status'
+        print('NAK - Rejected/Negative Status')
+        return False
     elif cmd == INC: # Incomplete Command Packet
-	print 'INC - Incomplete Command Packet'
+	raise Exception('INC - Incomplete Command Packet')
     elif cmd == UNR: # Unrecognized Command Packet
-        print 'UNR - Unrecognized Command Packet'
+        raise Exception('UNR - Unrecognized Command Packet')
     elif cmd == CER: # Data Packet Checksum Error
-        print 'CER - Data Packet Checksum Error'
+        raise Exception('CER - Data Packet Checksum Error')
     else:
         raise Exception('Received bad CMD in response from card dispenser')
-
-    print packet
 
 
 def parsedata(packet):
     '''parse the data section of a packet, it can range from 0 to many bytes'''
     data = []
     datalength = ord(packet[3])
-    position = 0
-    while position < datalength:
-        data.append(packet[position + 3])
+    print 'datalength: ' + str(datalength)
+    position = 4
+    while position < datalength + 4:
+        data.append(packet[position])
+        position += 1
     return data
+
+
+def parsestatus(data):
+    code = ord(data[0])
+    if code == READY:
+        print(' response: ready')
+    elif code == BUSY:
+        raise NakException('NAK response: busy', BUSY)
+    elif code == EMPTY:
+        raise NakException('NAK response: empty', EMPTY)
+    elif code == STUCK:
+        raise NakException('NAK response: stuck', BUSY)
+    elif code == CARD_HOLD:
+        raise NakException('NAK response: card hold', CARD_HOLD)
+    elif code == DISABLED:
+        raise NakException('NAK response: disabled', DISABLED)
+    elif code == CHECK_SENSORS:
+        raise NakException('NAK response: check sensors', CHECK_SENSORS)
+    elif code == LOW_CARD_DETECTED:
+        raise NakException('NAK response: low card detected', LOW_CARD_DETECTED)
+    else:
+        raise Exception('Bad response code: ' + str(code))
 
 
 def parseresponse(packet):
@@ -163,14 +191,14 @@ def parseresponse(packet):
         print 'this is not a packet: ' + str(packet)
         # this is not a packet, it could be the startup string, or a
         # garbled package, or something else
-        return
-    receivedchecksum = ord(packet[-1])
-    print packet[0:-1]
-    calculatedchecksum  = _checksum(packet[0:-1])
-    print str(receivedchecksum) + ' == ' + str(calculatedchecksum)
-    parsecommand(packet)
+        return None
     if not _matchchecksum(packet):
         return None
+    if parseresponsecode(packet):
+        return True
+    else:
+        parsestatus(parsedata(packet))
+
 
 # <STX><ADD><CMD><LEN><DTA><ETX><CHK>
 def sendcommand(command, datalength=0, data=None):
@@ -187,17 +215,28 @@ def sendcommand(command, datalength=0, data=None):
 #------------------------------------------------------------------------------#
 # for testing from the command line:
 def main(argv):
-    print('GO!')
-#    print sendcommand(REQUEST_STATUS)
-#    time.sleep(2)
-    print sendcommand(DISPENSE)
+    # first clear out anything in the receive buffer
+    while ser.inWaiting():
+        print receivepacket()
+    sendcommand(REQUEST_STATUS)
+    # wait for the reply
     waiting = True
     while waiting:
         if ser.inWaiting() > 0:
             waiting = False
     response = receivepacket()
-    print 'response: ' + str(response)
-    parseresponse(response)
+    if parseresponse(response):
+        sendcommand(DISPENSE)
+        # wait for the reply
+        waiting = True
+        while waiting:
+            if ser.inWaiting() > 0:
+                waiting = False
+        # parse the reply
+        response = receivepacket()
+        parseresponse(response)
+    else:
+        print 'NOT READY'
     print('inWaiting: ' + str(ser.inWaiting()))
     ser.close()
     
