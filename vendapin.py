@@ -116,6 +116,19 @@ def receivepacket():
     return bytes
 
 
+def _matchchecksum(packet):
+    receivedchecksum = ord(packet[-1])
+    print packet[0:-1]
+    calculatedchecksum  = _checksum(packet[0:-1])
+    # TODO perhaps this should throw an Exception when the checksums don't match?
+    if receivedchecksum == calculatedchecksum:
+        return True
+    else:
+        print 'CHECKSUM ERROR' + str(receivedchecksum) + ' != ' + str(calculatedchecksum)
+        return False
+
+
+def parseresponsecode(packet):
 def parsecommand(packet):
     '''parse the "command" byte from the response packet to get a "response code"'''
     cmd = ord(packet[2])
@@ -156,6 +169,8 @@ def parseresponse(packet):
     calculatedchecksum  = _checksum(packet[0:-1])
     print str(receivedchecksum) + ' == ' + str(calculatedchecksum)
     parsecommand(packet)
+    if not _matchchecksum(packet):
+        return None
 
 # <STX><ADD><CMD><LEN><DTA><ETX><CHK>
 def sendcommand(command, datalength=0, data=None):
