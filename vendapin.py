@@ -215,13 +215,19 @@ class Vendapin():
 
 
     def request_status(self):
+        '''request the status of the card dispenser and return the status code'''
         self.sendcommand(Vendapin.REQUEST_STATUS)
         # wait for the reply
         waiting = True
         while waiting:
             if self.serial.inWaiting() > 0:
                 waiting = False
-        return self.receivepacket()
+        response = self.receivepacket()
+        if self.was_packet_accepted(response):
+            return Vendapin.READY
+        else:
+            return self.parsedata(response)[0]
+
 
 #------------------------------------------------------------------------------#
 # for testing from the command line:
@@ -231,14 +237,8 @@ def main(argv):
     v.open()
     while v.inWaiting():
         print v.receivepacket()
-#    v.sendcommand(Vendapin.REQUEST_STATUS)
-    # wait for the reply
-#    waiting = True
-#    while waiting:
-#        if v.inWaiting() > 0:
-#            waiting = False
-#    response = v.receivepacket()
-    if v.was_packet_accepted(v.request_status()):
+    status = v.request_status()
+    if status == Vendapin.READY:
         v.sendcommand(Vendapin.DISPENSE)
         # wait for the reply
         waiting = True
@@ -249,7 +249,7 @@ def main(argv):
         response = v.receivepacket()
         v.validatepacket(response)
     else:
-        print 'NOT READY'
+        print 'NOT READY: ' + status
     print('inWaiting: ' + str(v.inWaiting()))
     v.close()
     
