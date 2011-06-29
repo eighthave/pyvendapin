@@ -99,6 +99,13 @@ class Vendapin():
     def close(self):
         return self.serial.close()
 
+    def flush(self):
+        while self.serial.inWaiting():
+            print self.serial.receivepacket()
+        self.serial.flush()
+        self.serial.flushInput()
+        self.serial.flushOutput()
+
     def inWaiting(self):
         return self.serial.inWaiting()
 
@@ -249,8 +256,7 @@ def main(argv):
     # first clear out anything in the receive buffer
     v = Vendapin()
     v.open()
-    while v.inWaiting():
-        print v.receivepacket()
+    v.flush()
     status = None
     while status != Vendapin.READY:
         status = v.request_status()
