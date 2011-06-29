@@ -135,14 +135,12 @@ class Vendapin():
         print packet[0:-1]
         calculatedchecksum  = self._checksum(packet[0:-1])
         # TODO perhaps this should throw an Exception when the checksums don't match?
-        if receivedchecksum == calculatedchecksum:
-            return True
-        else:
+        if receivedchecksum != calculatedchecksum:
             print 'CHECKSUM ERROR' + str(receivedchecksum) + ' != ' + str(calculatedchecksum)
-            return False
+            raise Exception('Checksum failed: ' + str(packet))
 
 
-    def parseresponsecode(self, packet):
+    def was_packet_accepted(self, packet):
         '''parse the "command" byte from the response packet to get a "response code"'''
         cmd = ord(packet[2])
         if cmd == Vendapin.ACK: # Accepted/Positive Status
@@ -194,18 +192,12 @@ class Vendapin():
             raise Exception('Bad response code: ' + str(code))
 
 
-    def parseresponse(self, packet):
+    def validatepacket(self, packet):
         if ord(packet[0]) != Vendapin.STX or ord(packet[-2]) != Vendapin.ETX:
-            print 'this is not a packet: ' + str(packet)
+            raise Exception('this is not a packet: ' + str(packet))
             # this is not a packet, it could be the startup string, or a
             # garbled package, or something else
-            return None
-        if not self._matchchecksum(packet):
-            return None
-        if self.parseresponsecode(packet):
-            return True
-        else:
-            self.parsestatus(self.parsedata(packet))
+        self._matchchecksum(packet)
 
 
     # <STX><ADD><CMD><LEN><DTA><ETX><CHK>
@@ -222,6 +214,15 @@ class Vendapin():
         self.serial.write(sendpacket)
 
 
+    def request_status(self):
+        self.sendcommand(Vendapin.REQUEST_STATUS)
+        # wait for the reply
+        waiting = True
+        while waiting:
+            if self.serial.inWaiting() > 0:
+                waiting = False
+        return self.receivepacket()
+
 #------------------------------------------------------------------------------#
 # for testing from the command line:
 def main(argv):
@@ -230,14 +231,14 @@ def main(argv):
     v.open()
     while v.inWaiting():
         print v.receivepacket()
-    v.sendcommand(Vendapin.REQUEST_STATUS)
+#    v.sendcommand(Vendapin.REQUEST_STATUS)
     # wait for the reply
-    waiting = True
-    while waiting:
-        if v.inWaiting() > 0:
-            waiting = False
-    response = v.receivepacket()
-    if v.parseresponse(response):
+#    waiting = True
+#    while waiting:
+#        if v.inWaiting() > 0:
+#            waiting = False
+#    response = v.receivepacket()
+    if v.was_packet_accepted(v.request_status()):
         v.sendcommand(Vendapin.DISPENSE)
         # wait for the reply
         waiting = True
@@ -246,7 +247,7 @@ def main(argv):
                 waiting = False
         # parse the reply
         response = v.receivepacket()
-        v.parseresponse(response)
+        v.validatepacket(response)
     else:
         print 'NOT READY'
     print('inWaiting: ' + str(v.inWaiting()))
