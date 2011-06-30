@@ -44,7 +44,7 @@ class Vendapin():
     READ_TOTAL_BUTTON_COUNT = 0x83  # Read Total Dispense Button Count Meter (count after Dispense button is used)
     WRITE_TOTAL_RETRIES = 0x84 # Write Total Number of Retries
     READ_TOTAL_RETRIES = 0x85  # Read Total Number of Retries
-    RESET_SETTINGS = 0x86      # Reset the card dispenser settings - no data or 1 byte unsigned CHAR
+    RESET = 0x86               # Reset the card dispenser settings - no data or 1 byte unsigned CHAR
     WRITE_CARD_HOLD = 0x87     # Write “Hold the card in dispenser” set - 1 byte unsigned CHAR
     READ_CARD_HOLD = 0x88      # Read “Hold the card in dispenser” set  - no data
     WRITE_DELAY = 0x89         # Write “Delay Time” in secs             - 1 byte unsigned CHAR
@@ -101,7 +101,7 @@ class Vendapin():
 
     def flush(self):
         while self.serial.inWaiting():
-            print self.serial.receivepacket()
+            print('(flushed: ' + str(self.receivepacket()) + ')')
         self.serial.flush()
         self.serial.flushInput()
         self.serial.flushOutput()
@@ -130,16 +130,18 @@ class Vendapin():
             byte = self.serial.read()
             if byte != '':
                 bytes.append(byte)
-            if byte == Vendapin.ETX: endofpacket = True
-        # don't forget the checksum...
-        if self.serial.inWaiting():
-            bytes.append(self.serial.read())
+            if byte == Vendapin.ETX:
+                # got End of Packet, grab checksum and bail
+                bytes.append(self.serial.read())
+                endofpacket = True
+            if byte == '\r': # 'VENDAPIN\r' boot message
+                endofpacket = True
         return bytes
 
 
     def _matchchecksum(self, packet):
         receivedchecksum = ord(packet[-1])
-        print packet[0:-1]
+        print('_matchchecksum: ' + str(packet[0:-1]))
         calculatedchecksum  = self._checksum(packet[0:-1])
         # TODO perhaps this should throw an Exception when the checksums don't match?
         if receivedchecksum != calculatedchecksum:
@@ -250,18 +252,44 @@ class Vendapin():
         if not self.was_packet_accepted(response):
             raise Exception('card not dispensed')
 
+    def reset(self, hard=False):
+        '''reset the card dispense, either soft or hard based on boolean 2nd arg'''
+        if hard:
+            self.sendcommand(Vendapin.RESET, 1, 0x01)
+        else:
+            self.sendcommand(Vendapin.RESET)
+            # wait for the reply
+            waiting = True
+            while waiting:
+                if self.serial.inWaiting() > 0:
+                    waiting = False
+            # parse the reply
+            response = self.receivepacket()
+            print('reset(soft): ' + str(response))
+            if not self.was_packet_accepted(response):
+                raise Exception('reset reponse not received')
+
+
 #------------------------------------------------------------------------------#
 # for testing from the command line:
 def main(argv):
     # first clear out anything in the receive buffer
     v = Vendapin()
     v.open()
+    v.reset(hard=True)
+    time.sleep(2)
     v.flush()
-    status = None
-    while status != Vendapin.READY:
-        status = v.request_status()
-        print 'NOT READY: ' + str(status)
-    v.dispense()
+    if len(argv) > 0:
+        todispense = int(argv[0])
+    else:
+        todispense = 1
+    print('Dispensing ' + str(todispense) + ' cards')
+    for x in range(0,todispense):
+        status = None
+        while status != Vendapin.READY:
+            status = v.request_status()
+            print 'NOT READY: ' + str(status)
+        v.dispense()
     print('inWaiting: ' + str(v.inWaiting()))
     v.close()
     
