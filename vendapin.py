@@ -228,10 +228,7 @@ class Vendapin():
         '''request the status of the card dispenser and return the status code'''
         self.sendcommand(Vendapin.REQUEST_STATUS)
         # wait for the reply
-        waiting = True
-        while waiting:
-            if self.serial.inWaiting() > 0:
-                waiting = False
+        time.sleep(1)
         response = self.receivepacket()
         if self.was_packet_accepted(response):
             return Vendapin.READY
@@ -243,26 +240,21 @@ class Vendapin():
         '''dispense a card if ready, otherwise throw an Exception'''
         self.sendcommand(Vendapin.DISPENSE)
         # wait for the reply
-        waiting = True
-        while waiting:
-            if self.serial.inWaiting() > 0:
-                waiting = False
+        time.sleep(1)
         # parse the reply
         response = self.receivepacket()
         if not self.was_packet_accepted(response):
             raise Exception('card not dispensed')
 
+
     def reset(self, hard=False):
         '''reset the card dispense, either soft or hard based on boolean 2nd arg'''
         if hard:
             self.sendcommand(Vendapin.RESET, 1, 0x01)
+            time.sleep(2)
         else:
             self.sendcommand(Vendapin.RESET)
-            # wait for the reply
-            waiting = True
-            while waiting:
-                if self.serial.inWaiting() > 0:
-                    waiting = False
+            time.sleep(2)
             # parse the reply
             response = self.receivepacket()
             print('reset(soft): ' + str(response))
