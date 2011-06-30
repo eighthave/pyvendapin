@@ -244,7 +244,8 @@ class Vendapin():
         # parse the reply
         response = self.receivepacket()
         if not self.was_packet_accepted(response):
-            raise Exception('card not dispensed')
+            raise Exception('DISPENSE packet not accepted: ' + str(response))
+        return self.parsedata(response)[0]
 
 
     def reset(self, hard=False):
