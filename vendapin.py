@@ -74,14 +74,14 @@ class Vendapin():
     CER = 0xFF  # Data Packet Checksum Error
 
     # status values
-    READY = 0x30         # Ready to dispense the card
-    BUSY  = 0x31         # The card dispenser is busy dispensing the card
-    EMPTY = 0x32         # No cards inside the card dispenser stack
-    STUCK = 0x33         # Card is jammed inside the card dispenser
-    CARD_HOLD = 0x34     # Card is dispensed, but not yet removed
-    DISABLED = 0x35
-    CHECK_SENSORS = 0x36
-    LOW_CARD_DETECTED = 0x37
+    READY = '0'         # Ready to dispense the card
+    BUSY  = '1'         # The card dispenser is busy dispensing the card
+    EMPTY = '2'         # No cards inside the card dispenser stack
+    STUCK = '3'         # Card is jammed inside the card dispenser
+    CARD_HOLD = '4'     # Card is dispensed, but not yet removed
+    DISABLED = '5'
+    CHECK_SENSORS = '6'
+    LOW_CARD_DETECTED = '7'
 
     def __init__(self, port='/dev/ttyUSB0'):
         self.serial = serial.Serial(port=port,
@@ -281,7 +281,7 @@ def main(argv):
         status = None
         while status != Vendapin.READY:
             status = v.request_status()
-            print 'NOT READY: ' + str(status)
+            print 'NOT READY: ' + status
         v.dispense()
     print('inWaiting: ' + str(v.inWaiting()))
     v.close()
