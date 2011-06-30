@@ -1,4 +1,4 @@
-#!/sw/bin/python2.6
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
 # module to support the Vendapin serial protocol
@@ -83,7 +83,7 @@ class Vendapin():
     CHECK_SENSORS = 0x36
     LOW_CARD_DETECTED = 0x37
 
-    def __init__(self, port='/dev/tty.usbserial-0000201A'):
+    def __init__(self, port='/dev/ttyUSB0'):
         self.serial = serial.Serial(port=port,
                                     baudrate=19200,
                                     bytesize=8,
