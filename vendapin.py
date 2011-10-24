@@ -141,7 +141,6 @@ class Vendapin():
 
     def _matchchecksum(self, packet):
         receivedchecksum = ord(packet[-1])
-        print('_matchchecksum: ' + str(packet[0:-1]))
         calculatedchecksum  = self._checksum(packet[0:-1])
         # TODO perhaps this should throw an Exception when the checksums don't match?
         if receivedchecksum != calculatedchecksum:
@@ -150,7 +149,9 @@ class Vendapin():
 
 
     def _validatepacket(self, packet):
-        if ord(packet[0]) != Vendapin.STX or ord(packet[-2]) != Vendapin.ETX:
+        if len(packet) < 7 \
+                or ord(packet[0]) != Vendapin.STX \
+                or ord(packet[-2]) != Vendapin.ETX:
             raise Exception('this is not a packet: ' + str(packet))
             # this is not a packet, it could be the startup string, or a
             # garbled package, or something else
@@ -180,7 +181,6 @@ class Vendapin():
         '''parse the data section of a packet, it can range from 0 to many bytes'''
         data = []
         datalength = ord(packet[3])
-        print 'datalength: ' + str(datalength)
         position = 4
         while position < datalength + 4:
             data.append(packet[position])
@@ -213,8 +213,6 @@ class Vendapin():
     # <STX><ADD><CMD><LEN><DTA><ETX><CHK>
     def sendcommand(self, command, datalength=0, data=None):
         '''send a packet in the vendapin format'''
-        print chr(Vendapin.STX)
-        print chr(Vendapin.ADD)
         packet = chr(Vendapin.STX) + chr(Vendapin.ADD) + chr(command) + chr(datalength)
         if datalength > 0:
             packet += chr(data)
@@ -243,6 +241,7 @@ class Vendapin():
         time.sleep(1)
         # parse the reply
         response = self.receivepacket()
+        print('Vendapin.dispense(): ' + str(response))
         if not self.was_packet_accepted(response):
             raise Exception('DISPENSE packet not accepted: ' + str(response))
         return self.parsedata(response)[0]
@@ -258,22 +257,23 @@ class Vendapin():
             time.sleep(2)
             # parse the reply
             response = self.receivepacket()
-            print('reset(soft): ' + str(response))
+            print('Vendapin.reset(soft): ' + str(response))
             if not self.was_packet_accepted(response):
                 raise Exception('reset reponse not received')
 
 
 #------------------------------------------------------------------------------#
 # for testing from the command line:
+# call like ./vendapin.py /dev/ttyUSB0 <# to dispense>
 def main(argv):
     # first clear out anything in the receive buffer
-    v = Vendapin()
+    v = Vendapin(port=argv[0])
     v.open()
-    v.reset(hard=True)
-    time.sleep(2)
+#    v.reset()
+#    time.sleep(5)
     v.flush()
-    if len(argv) > 0:
-        todispense = int(argv[0])
+    if len(argv) > 1:
+        todispense = int(argv[1])
     else:
         todispense = 1
     print('Dispensing ' + str(todispense) + ' cards')
