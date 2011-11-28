@@ -285,9 +285,8 @@ def main(argv):
 #            status = v.request_status()
 #            print 'NOT READY: ' + status
         v.dispense()
-        time.sleep(2)
         v.dispense()
-        time.sleep(2)
+        time.sleep(3)
     print('inWaiting: ' + str(v.inWaiting()))
     v.close()
     
