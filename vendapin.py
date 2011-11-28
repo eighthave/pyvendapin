@@ -258,8 +258,9 @@ class Vendapin():
             # parse the reply
             response = self.receivepacket()
             print('Vendapin.reset(soft): ' + str(response))
-            if not self.was_packet_accepted(response):
-                raise Exception('reset reponse not received')
+            # this seems to do nothing and fail a lot, so ignore it:
+            #if not self.was_packet_accepted(response):
+            #    raise Exception('reset reponse not received')
 
 
 #------------------------------------------------------------------------------#
@@ -269,8 +270,9 @@ def main(argv):
     # first clear out anything in the receive buffer
     v = Vendapin(port=argv[0])
     v.open()
-#    v.reset()
-#    time.sleep(5)
+    time.sleep(1)
+    v.reset()
+    time.sleep(1)
     v.flush()
     if len(argv) > 1:
         todispense = int(argv[1])
@@ -278,11 +280,14 @@ def main(argv):
         todispense = 1
     print('Dispensing ' + str(todispense) + ' cards')
     for x in range(0,todispense):
-        status = None
-        while status != Vendapin.READY:
-            status = v.request_status()
-            print 'NOT READY: ' + status
+#        status = None
+#        while status != Vendapin.READY:
+#            status = v.request_status()
+#            print 'NOT READY: ' + status
         v.dispense()
+        time.sleep(2)
+        v.dispense()
+        time.sleep(2)
     print('inWaiting: ' + str(v.inWaiting()))
     v.close()
     
